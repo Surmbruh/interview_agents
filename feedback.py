@@ -1,17 +1,23 @@
+"""
+Feedback Node - Generates final report with hiring decision and development roadmap.
+Includes bonus web search for learning resources.
+"""
 from state import AgentState
 from utils.report import generate_final_report, generate_development_roadmap
 from utils.logger import LoggerUtils
 from langchain_core.messages import AIMessage
-from langchain_community.tools import DuckDuckGoSearchRun
-import json
+from utils.log_config import get_logger
 import concurrent.futures
+
+logger = get_logger("feedback")
+
 
 def feedback_node(state: AgentState):
     """
     Generates the final report, performs bonus web search for roadmap, 
     and saves the log (including the final turn N).
     """
-    print("--- Generating Feedback (Including Bonus Search) ---")
+    logger.info("Generating final feedback report...")
     
     from utils.report import generate_technical_report
     from langchain_openai import ChatOpenAI
@@ -27,12 +33,16 @@ def feedback_node(state: AgentState):
     )
     
     # 1. Manager Decision
+    logger.info("Manager Agent evaluating candidate...")
     manager = ManagerAgent(llm)
     manager_decision = manager.evaluate(state)
     manager_report = manager.format_decision_report(manager_decision)
     
+    logger.debug("Manager decision: %s (Confidence: %s%%)", 
+                 manager_decision.get('decision', 'N/A'),
+                 manager_decision.get('confidence_score', 0))
+    
     # --- LOGGING FINAL TURN (N) ---
-    # According to req: turn N includes Question N, Stop Answer, and Thoughts about final feedback.
     loop_count = state.get("loop_count", 0)
     last_question = state.get("current_question", "")
     messages = state.get("messages", [])
@@ -42,8 +52,7 @@ def feedback_node(state: AgentState):
         
     # Aggregate thoughts for turn N
     turn_thoughts = state.get("current_turn_thoughts", {})
-    # Manager's deliberation is part of final thoughts
-    turn_thoughts["Manager"] = f"Final evaluation: {manager_decision.get('recommendation', 'N/A')}. Confidence: {manager_decision.get('confidence', 0)}%"
+    turn_thoughts["Manager"] = f"Final evaluation: {manager_decision.get('recommendation', 'N/A')}. Confidence: {manager_decision.get('confidence_score', 0)}%"
     
     formatted_thoughts = ""
     for agent, thought in turn_thoughts.items():
@@ -57,40 +66,24 @@ def feedback_node(state: AgentState):
     }
     
     # 2. Technical Review
+    logger.info("Generating technical review...")
     technical_report = generate_technical_report(state, llm)
     
-    # 3. Roadmap + Bonus Search (Existing logic)
+    # 3. Roadmap + Bonus Search
     internal_thoughts = state.get("internal_thoughts", [])
     gaps = []
     for thought in internal_thoughts:
-         if isinstance(thought, dict):
+        if isinstance(thought, dict):
             if thought.get("decision") in ["DECREASE_DIFFICULTY", "MAINTAIN"]:
                 gaps.append(thought.get("analysis", ""))
 
-    from ddgs import DDGS
+    # Web search for learning resources
     links_section = ""
     if gaps:
-        print("    Searching for learning resources (Bonus)...")
-        top_gaps = gaps[:3] 
-        links = []
-        def search_gap(gap_text):
-            try:
-                query = f"guide tutorial documentation {gap_text[:50]}"
-                with DDGS() as ddgs:
-                    results = list(ddgs.text(query, max_results=1))
-                    if results:
-                        res = results[0]
-                        return f"- **Topic**: {gap_text[:100]}...\n  - **Resource**: [{res['title']}]({res['href']})"
-                return None
-            except Exception: return None
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-            future_to_gap = {executor.submit(search_gap, gap): gap for gap in top_gaps}
-            for future in concurrent.futures.as_completed(future_to_gap):
-                result = future.result()
-                if result: links.append(result)
-        if links:
-            links_section = "### Рекомендованные материалы (Auto-Generated)\n" + "\n".join(links)
+        logger.info("Searching for learning resources (DuckDuckGo)...")
+        links_section = _search_learning_resources(gaps[:3])
+    else:
+        logger.debug("No knowledge gaps detected, skipping web search")
 
     from utils.report import generate_development_roadmap
     roadmap_core = generate_development_roadmap(state, llm)
@@ -122,11 +115,71 @@ def feedback_node(state: AgentState):
     # Join the accumulated log with the very last turn
     full_log = state.get("interview_log", []) + [final_turn_log]
     
-    LoggerUtils.save_log(state['candidate_info'].get('Name', 'N/A'), full_log, full_report, filename=filename)
+    LoggerUtils.save_log(
+        state['candidate_info'].get('Name', 'N/A'), 
+        full_log, 
+        full_report, 
+        filename=filename
+    )
     
-    print("\n" + "="*30)
+    logger.info("Report saved to %s", filename)
+    
+    # Print report to console
+    print("\n" + "="*50)
     print("FINAL FEEDBACK REPORT")
-    print("="*30)
+    print("="*50)
     print(full_report)
     
     return {"messages": [AIMessage(content="INTERVIEW_FINISHED")]}
+
+
+def _search_learning_resources(gaps: list) -> str:
+    """
+    Search for learning resources using DuckDuckGo.
+    Uses concurrent execution for faster results.
+    
+    Args:
+        gaps: List of knowledge gap descriptions
+        
+    Returns:
+        Formatted markdown string with links
+    """
+    try:
+        from ddgs import DDGS
+    except ImportError:
+        logger.warning("ddgs package not installed, skipping web search")
+        return ""
+    
+    links = []
+    
+    def search_gap(gap_text: str) -> str | None:
+        """Search for a single knowledge gap."""
+        try:
+            query = f"guide tutorial documentation {gap_text[:50]}"
+            logger.debug("Searching: %s", query)
+            
+            with DDGS() as ddgs:
+                results = list(ddgs.text(query, max_results=1))
+                if results:
+                    res = results[0]
+                    logger.debug("Found: %s", res['title'])
+                    return f"- **Topic**: {gap_text[:100]}...\n  - **Resource**: [{res['title']}]({res['href']})"
+            return None
+        except Exception as e:
+            logger.debug("Search failed for '%s': %s", gap_text[:30], e)
+            return None
+
+    # Execute searches concurrently
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        future_to_gap = {executor.submit(search_gap, gap): gap for gap in gaps}
+        for future in concurrent.futures.as_completed(future_to_gap):
+            result = future.result()
+            if result:
+                links.append(result)
+    
+    if links:
+        logger.info("Found %d learning resources", len(links))
+        return "### Рекомендованные материалы (Auto-Generated)\n" + "\n".join(links)
+    
+    logger.debug("No learning resources found")
+    return ""

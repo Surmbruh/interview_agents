@@ -1,5 +1,13 @@
+"""
+Utility class for saving interview logs to JSON files.
+"""
 import json
+import os
 from typing import List, Dict, Any
+from utils.log_config import get_logger
+
+logger = get_logger("logger")
+
 
 class LoggerUtils:
     """
@@ -7,15 +15,23 @@ class LoggerUtils:
     """
     
     @staticmethod
-    def save_log(participant_name: str, turns: List[Dict[str, Any]], final_feedback: str, filename: str = "interview_log.json"):
+    def save_log(
+        participant_name: str, 
+        turns: List[Dict[str, Any]], 
+        final_feedback: str, 
+        filename: str = "interview_log.json"
+    ) -> bool:
         """
         Save the interview log to a JSON file with the specified structure.
         
         Args:
             participant_name: Name of the candidate.
-            turns: List of turn data dictionaries. Each dict should have 'turn_id', 'internal_thoughts', 'user_input', 'agent_response'.
+            turns: List of turn data dictionaries.
             final_feedback: The comprehensive report generated at the end.
             filename: The file path to save the log to.
+            
+        Returns:
+            True if saved successfully, False otherwise.
         """
         data = {
             "participant_name": participant_name,
@@ -24,10 +40,11 @@ class LoggerUtils:
         }
         
         try:
-            import os
             abs_path = os.path.abspath(filename)
             with open(filename, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
-            print(f"Interview log saved to {abs_path}")
+            logger.info("Interview log saved to %s", abs_path)
+            return True
         except Exception as e:
-            print(f"Error saving interview log: {e}")
+            logger.error("Error saving interview log: %s", e)
+            return False

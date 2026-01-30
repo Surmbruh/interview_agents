@@ -1,4 +1,7 @@
-import os
+"""
+LangGraph definition for Multi-Agent Interview Coach.
+Defines the cyclic graph with nodes for each agent and routing logic.
+"""
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_openai import ChatOpenAI
@@ -12,6 +15,10 @@ from agents.critic import critic_node
 from router import router_node
 from feedback import feedback_node
 from config import settings
+from utils.log_config import get_logger
+
+# Setup logger for graph
+logger = get_logger("graph")
 
 # Load environment variables
 load_dotenv()
@@ -25,22 +32,27 @@ llm_interviewer = ChatOpenAI(model=settings.MODEL_INTERVIEWER, temperature=0.7, 
 observer_agent = ObserverAgent(llm_observer)
 interviewer_agent = InterviewerAgent(llm_interviewer)
 
+
 # Node Wrappers
 def planner_node_wrapper(state: AgentState):
     """Executes Planner Logic once"""
     if state.get("topic_plan"):
+        logger.debug("Topic plan already exists, skipping planner")
         return {"topic_plan": state["topic_plan"]}
     return planner_node(state)
 
+
 def observer_node_wrapper(state: AgentState):
     """Executes Observer Agent Logic"""
-    print("--- Observer Thinking ---")
+    logger.info("Observer analyzing response...")
     return observer_agent.run(state)
+
 
 def interviewer_node_wrapper(state: AgentState):
     """Executes Interviewer Agent Logic"""
-    print("--- Interviewer Speaking ---")
+    logger.info("Interviewer generating question...")
     return interviewer_agent.run(state)
+
 
 def critic_node_wrapper(state: AgentState):
     """Executes Critic Logic and manages retries"""
@@ -51,7 +63,8 @@ def critic_node_wrapper(state: AgentState):
     if result["critic_status"] == "REJECTED":
         return {**result, "critic_retry_count": current_retry + 1}
     else:
-        return {**result, "critic_retry_count": 0} # Reset on success
+        return {**result, "critic_retry_count": 0}  # Reset on success
+
 
 # Conditional Logic for Router
 def route_next_step(state: AgentState):
@@ -66,16 +79,18 @@ def route_next_step(state: AgentState):
     else:
         return "observer"
 
+
 # Conditional Logic for Quality Loop
 def route_critic_decision(state: AgentState):
     status = state.get("critic_status", "APPROVED")
     retry_count = state.get("critic_retry_count", 0)
     
     if status == "REJECTED" and retry_count < 2:
-        print(f"    ↺ Re-generating question (Attempt {retry_count + 1}/2)...")
+        logger.warning("Re-generating question (Attempt %d/2)...", retry_count + 1)
         return "interviewer"
     
     return END
+
 
 # Build the Graph
 builder = StateGraph(AgentState)
@@ -125,5 +140,7 @@ memory = MemorySaver()
 graph = builder.compile(checkpointer=memory)
 
 if __name__ == "__main__":
-    print("Graph compiled successfully.")
+    from utils.log_config import setup_logging
+    setup_logging("DEBUG")
+    logger.info("Graph compiled successfully")
     print(graph.get_graph().draw_ascii())

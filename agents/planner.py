@@ -1,16 +1,24 @@
+"""
+Planner Node - Generates interview topic plan based on candidate profile.
+Runs once at the beginning of the session.
+"""
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 from typing import List
-import os
 from state import AgentState
 from config import settings
 from utils.llm_utils import llm_retry
+from utils.log_config import get_logger
+
+logger = get_logger("planner")
+
 
 class PlanOutput(BaseModel):
     """Structured output for the Interview Planner."""
     topics: List[str] = Field(..., description="List of 4-5 technical topics to cover during the interview.")
     reasoning: str = Field(..., description="Brief explanation of why these topics were chosen.")
+
 
 @llm_retry
 def planner_node(state: AgentState):
@@ -21,12 +29,15 @@ def planner_node(state: AgentState):
     candidate_info = state["candidate_info"]
     company_profile = state.get("company_profile", "")
     
+    logger.info("Planning interview for %s %s", 
+                candidate_info.get('Grade'), 
+                candidate_info.get('Position'))
+    
     # Initialize LLM using settings
     api_base = settings.OPENAI_API_BASE
-    # Increase temperature for variety in topic selection across different sessions
     llm = ChatOpenAI(
         model=settings.MODEL_ROUTER, 
-        temperature=0.8, 
+        temperature=0.8,  # Higher for variety
         base_url=api_base,
         api_key=settings.OPENAI_API_KEY
     )
@@ -57,13 +68,12 @@ Even for the same position, try to explore different sub-areas in each plan to e
     
     chain = prompt | structured_llm
     
-    print(f"--- Planning Interview Session for {candidate_info.get('Grade')} {candidate_info.get('Position')} ---")
-    
     response: PlanOutput = chain.invoke({
         "candidate_info": str(candidate_info),
         "company_profile": company_profile
     })
     
-    print(f"--- Topic Plan: {', '.join(response.topics)} ---")
+    logger.info("Topic plan: %s", ', '.join(response.topics))
+    logger.debug("Planner reasoning: %s", response.reasoning)
     
     return {"topic_plan": response.topics}

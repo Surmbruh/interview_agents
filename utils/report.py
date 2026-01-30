@@ -1,15 +1,19 @@
-from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_openai import ChatOpenAI
+"""
+Report generation utilities for Interview Coach.
+Generates technical assessments and development roadmaps.
+"""
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
 from state import AgentState
+from utils.log_config import get_logger
 import os
+
+logger = get_logger("report")
 
 
 def generate_final_report(state: AgentState) -> str:
     """
-    Generates a comprehensive interview report using a multi-agent approach:
-    1. ManagerAgent makes the hiring decision
-    2. Report generator creates the detailed feedback
+    Generates a comprehensive interview report using a multi-agent approach.
     
     This ensures proper role specialization:
     - Observer analyzed responses during the interview
@@ -17,10 +21,9 @@ def generate_final_report(state: AgentState) -> str:
     - Manager makes the final decision
     - Report generator compiles everything
     """
-    messages = state.get("messages", [])
-    internal_thoughts = state.get("internal_thoughts", [])
     candidate_info = state.get("candidate_info", {})
-    interview_log = state.get("interview_log", [])
+    
+    logger.info("Generating final report for %s", candidate_info.get('Name', 'N/A'))
     
     # Initialize LLMs
     api_base = os.getenv("OPENAI_API_BASE")
@@ -31,7 +34,7 @@ def generate_final_report(state: AgentState) -> str:
     manager = ManagerAgent(llm)
     
     # Get Manager's decision
-    print("    → Manager Agent is evaluating the candidate...")
+    logger.debug("Manager Agent evaluating candidate...")
     manager_decision = manager.evaluate(state)
     manager_report = manager.format_decision_report(manager_decision)
     
@@ -69,8 +72,9 @@ def generate_technical_report(state: AgentState, llm: ChatOpenAI) -> str:
     Generates the technical assessment section of the report.
     """
     interview_log = state.get("interview_log", [])
-    internal_thoughts = state.get("internal_thoughts", [])
     candidate_info = state.get("candidate_info", {})
+    
+    logger.debug("Generating technical report...")
     
     system_prompt = """You are a Technical Assessment Specialist.
 Analyze the interview transcript and observer notes to create a detailed technical assessment.
@@ -124,6 +128,8 @@ def generate_development_roadmap(state: AgentState, llm: ChatOpenAI) -> str:
     interview_log = state.get("interview_log", [])
     internal_thoughts = state.get("internal_thoughts", [])
     candidate_info = state.get("candidate_info", {})
+    
+    logger.debug("Generating development roadmap...")
     
     system_prompt = """You are a Career Development Coach.
 Based on the interview performance, create a personalized development roadmap.

@@ -1,8 +1,16 @@
+"""
+Critic Node - Quality control for Interviewer's questions.
+Validates questions against repetition, grade alignment, and tone.
+"""
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from state import AgentState, CriticOutput
 from config import settings
 from utils.llm_utils import llm_retry
+from utils.log_config import get_logger
+
+logger = get_logger("critic")
+
 
 @llm_retry
 def critic_node(state: AgentState):
@@ -14,6 +22,8 @@ def critic_node(state: AgentState):
     candidate_info = state["candidate_info"]
     history = "\n".join([f"{m.type}: {m.content}" for m in messages[:-1]])
     last_question = messages[-1].content
+    
+    logger.debug("Validating question: %s", last_question[:80])
     
     # Initialize LLM using settings
     api_base = settings.OPENAI_API_BASE
@@ -50,15 +60,15 @@ If any criterion fails, set status to REJECTED and provide specific feedback on 
     
     chain = prompt | structured_llm
     
-    print("--- Quality Critic is checking the question ---")
-    
     response: CriticOutput = chain.invoke({
         "grade": candidate_info.get("Grade", "Middle"),
         "history": history,
         "last_question": last_question
     })
     
-    print(f"--- Critic Decision: {response.status} ---")
+    logger.info("Decision: %s", response.status)
+    if response.status == "REJECTED":
+        logger.debug("Feedback: %s", response.feedback)
     
     # Store thoughts
     critic_thought = f"Decision: {response.status}. {response.feedback}"

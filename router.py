@@ -1,35 +1,44 @@
+"""
+Router Node - Guardrail Classifier for user intent detection.
+Classifies user messages into: ANSWER, ROLE_REVERSAL, INJECTION, STOP
+"""
 from typing import Literal
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
-import os
 from state import AgentState
 from config import settings
 from utils.llm_utils import llm_retry
+from utils.log_config import get_logger
 
-# Структура выхода для классификатора
+logger = get_logger("router")
+
+
 class RouteResponse(BaseModel):
+    """Structured output for router classification."""
     category: Literal["ANSWER", "ROLE_REVERSAL", "INJECTION", "STOP"] = Field(
         ..., description="The classification of the user's input messages."
     )
     reasoning: str = Field(..., description="Brief explanation for the classification.")
 
+
 @llm_retry
 def router_node(state: AgentState):
     """
-    Guardrail Node: Классифицирует сообщение пользователя для маршрутизации.
-    Использует gpt-4o-mini для скорости и экономии.
+    Guardrail Node: Classifies user message for routing.
+    Uses gpt-4o-mini for speed and cost efficiency.
     """
     messages = state["messages"]
     
     # If this is the very first turn (no messages yet), just proceed as ANSWER
     if not messages:
-        print("--- Router: Initial turn, Proceeding to Interviewer ---")
+        logger.info("Initial turn - proceeding to Interviewer")
         return {"router_decision": "ANSWER"}
         
     last_message = messages[-1].content
+    logger.debug("Classifying user input: %s", last_message[:100])
     
-    # Инициализация модели через settings
+    # Initialize model via settings
     api_base = settings.OPENAI_API_BASE
     llm = ChatOpenAI(
         model=settings.MODEL_ROUTER, 
@@ -38,7 +47,7 @@ def router_node(state: AgentState):
         api_key=settings.OPENAI_API_KEY
     )
     
-    # Структурированный выход
+    # Structured output
     structured_llm = llm.with_structured_output(RouteResponse)
     
     system_prompt = """You are a Guardrail Classifier for an Interview Coach AI.
@@ -71,15 +80,15 @@ Analyze the input carefully. When in doubt, choose ANSWER.
     
     chain = prompt | structured_llm
     
-    # Вызов модели
+    # Invoke model
     try:
         response = chain.invoke({"input": last_message})
         decision = response.category
+        logger.debug("Reasoning: %s", response.reasoning)
     except Exception as e:
-        print(f"Router Error: {e}")
-        decision = "ANSWER" # Fallback
+        logger.error("Router classification failed: %s", e)
+        decision = "ANSWER"  # Fallback
         
-    print(f"--- Router Decision: {decision} ---")
+    logger.info("Decision: %s", decision)
     
-    # Возвращаем решение в state (потребуется добавить поле router_decision в AgentState)
     return {"router_decision": decision}
