@@ -1,10 +1,25 @@
-langchain
-langgraph
-langchain-openai
-pydantic
-python-dotenv
-duckduckgo-search
-langchain-community
-pydantic-settings
-tenacity
-streamlit
+# Core dependencies
+langchain>=0.1.0
+langgraph>=0.0.28
+langchain-openai>=0.0.5
+langchain-community>=0.0.20
+
+# Data validation
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Environment & utilities
+python-dotenv>=1.0.0
+tenacity>=8.2.0
+
+# Search (for roadmap generation)
+duckduckgo-search>=4.0.0
+
+# Frontend
+streamlit>=1.30.0
+
+# Development & Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+ruff>=0.1.0
+mypy>=1.8.0

@@ -1,9 +1,47 @@
+# Virtual environments
 venv/
 .venv/
+env/
+
+# Python bytecode
 __pycache__/
 *.py[cod]
+*$py.class
+*.pyo
+
+# Environment files (keep .env.example)
 .env
-interview_log.json
+.env.local
+
+# IDE
 .idea/
 .vscode/
+*.swp
+*.swo
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Test & Coverage
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Logs (keep sample logs for demo)
+# interview_log.json - commented to keep sample
+*.log
+
+# Type checking
+.mypy_cache/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
