@@ -86,6 +86,3 @@ python main.py
 ```bash
 python validate_logs.py interview_log_1.json
 ```
-
-## Лицензия
-MIT
