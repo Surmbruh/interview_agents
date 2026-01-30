@@ -1,0 +1,9 @@
+langchain
+langgraph
+langchain-openai
+pydantic
+python-dotenv
+duckduckgo-search
+langchain-community
+pydantic-settings
+tenacity
