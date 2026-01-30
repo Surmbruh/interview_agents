@@ -71,13 +71,20 @@ class AgentState(TypedDict):
     """
     Turn-by-turn log for JSON export. Each entry contains:
     - turn_id: Sequential number
-    - internal_thoughts: Observer's analysis for this turn
-    - user_input: What the candidate said
-    - agent_response: What the interviewer responded
-    
-    Used for generating the final report and audit trail.
+    - agent_visible_message: What the interviewer asked
+    - user_message: What the candidate replied
+    - internal_thoughts: Formatted string "[Agent]: Thought\n"
     """
     
+    current_question: str
+    """The last question asked by the interviewer (needed to log the full turn)."""
+    
+    current_turn_thoughts: Dict[str, str]
+    """Accumulated thoughts from different agents for the current turn."""
+    
+    session_id: int
+    """The scenario number (1-5) used for naming the log file."""
+
     # === Control Variables ===
     loop_count: int
     """Number of completed Q&A cycles. Used to limit interview length."""

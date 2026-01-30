@@ -133,5 +133,6 @@ Keep mental track of covered topics. Suggest questions on NEW areas like:
             
         return {
             "internal_thoughts": [thought_data],
-            "topics_covered": thought_data.get("topics_covered", [])
+            "topics_covered": thought_data.get("topics_covered", []),
+            "current_turn_thoughts": {"Observer": thought_data["analysis"]}
         }

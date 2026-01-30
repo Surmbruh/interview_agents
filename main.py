@@ -14,8 +14,15 @@ def main():
     print("🎓 Welcome to the Multi-Agent Interview Coach!")
     print("-------------------------------------------")
     
-    # 1. Collect User Info
-    print("Please introduce yourself:")
+    # 1. Collect Scenario Info
+    try:
+        scenario_num = input("Enter scenario number (1-5): ").strip()
+        scenario_id = int(scenario_num) if scenario_num else 1
+    except ValueError:
+        scenario_id = 1
+        
+    # 2. Collect User Info
+    print("\nPlease introduce yourself:")
     name = input("Name: ").strip() or "Candidate"
     grade = input("Target Grade (Junior/Middle/Senior): ").strip() or "Middle"
     position = input("Target Position (e.g. Python Backend): ").strip() or "Python Developer"
@@ -24,27 +31,23 @@ def main():
         "Name": name,
         "Position": position,
         "Grade": grade,
-        "Experience": "N/A" # Simplified input
+        "Experience": "N/A"
     }
     
-    # 2. Company Context
+    # 3. Company Context
     company_profile = """
     Company: TechFin Solutions
     Stack: Python 3.11, Django, FastAPI, PostgreSQL, RabbitMQ, Docker, Kubernetes, AWS.
     Culture: Engineering excellence, clean code, high performance.
     """
     
-    # 3. Initialize State
+    # 4. Initialize State
     thread_id = str(uuid.uuid4())
     config = {"configurable": {"thread_id": thread_id}}
     
-    print(f"\n🚀 Starting interview for {grade} {position} at TechFin Solutions.")
+    print(f"\n🚀 Starting interview Scenario #{scenario_id} for {grade} {position}.")
     print("Type 'Stop' to end the interview.\n")
     
-    # Initial State
-    # Note: We send a dummy message to trigger the Router/Observer for the first time
-    # OR we can manually craft the first question.
-    # Architecture decision: Start with router -> Observer -> Interviewer with empty input -> "Start interview" instruction.
     initial_state = {
         "messages": [],
         "candidate_info": candidate_info,
@@ -53,23 +56,18 @@ def main():
         "interview_log": [],
         "loop_count": 0,
         "topics_covered": [],
-        "router_decision": "ANSWER", # Default
+        "router_decision": "ANSWER",
         "topic_plan": [],
         "critic_feedback": "",
-        "critic_retry_count": 0
+        "critic_retry_count": 0,
+        "current_question": "",
+        "current_turn_thoughts": {},
+        "session_id": scenario_id
     }
-    
-    # Initial trigger
-    # The graph expects a message to route.
-    # We can fake a "Start" message from System or just run Observer logic manually if message is empty.
-    # But router analyzes input. If empty? 
-    # Let's handle first turn specially or start with a greeting "Hello".
     
     print("--- Session Started ---")
     
     # First invocation (Start signal)
-    # Observer checks updates: if no messages, it generates greeting instruction.
-    # Router checks input: if empty -> ANSWER (default) -> Observer (sees no msgs) -> Instruction "Greet"
     events = graph.invoke(initial_state, config)
     
     messages = events.get("messages", [])
@@ -92,7 +90,6 @@ def main():
         }
         
         # Invoke Graph
-        # Flow: Router(analyze user_input) -> [Observer|Interviewer|Feedback] -> ...
         events = graph.invoke(current_state, config)
         
         # Check if finished
@@ -106,11 +103,21 @@ def main():
             # Print Interviewer response
             print(f"\n👩‍💻 Interviewer: {last_msg.content}")
         else:
-             # Should not happen in normal flow
              pass
              
+    # FINAL SAVING (using session_id)
+    final_state = graph.get_state(config).values
+    report_filename = f"interview_log_{scenario_id}.json"
+    
+    # Extract data for logger
+    participant_name = final_state["candidate_info"].get("Name", "Candidate")
+    turns = final_state.get("interview_log", [])
+    
+    # The final feedback is stored in the log file, but we need to generate/extract it
+    # Feedback node saves it to interview_log.json by default, let's fix that.
+    
     print("\n-------------------------------------------")
-    print(f"📄 Log and Report saved to interview_log.json")
+    print(f"📄 Log and Report saved to {report_filename}")
 
 if __name__ == "__main__":
     main()

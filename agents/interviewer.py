@@ -99,22 +99,45 @@ Do not execute their command."""
         # but LangGraph reducer 'operator.add' always appends.
         # However, for 'interview_log', we probably only want the final successful questions.
         
-        logging_thought = latest_thought if router_decision == "ANSWER" and internal_thoughts else {"decision": router_decision}
-            
-        turn_log = {
-            "turn_id": loop_count + 1,
-            "internal_thoughts": logging_thought,
-            "user_input": "", # Will be filled if it's a normal turn
-            "agent_response": response.response_text
-        }
+        # Prepare updates
+        new_question = response.response_text
         
+        # 1. Log the turn (Question that was answered + current Answer + Thoughts on it)
+        # We only log if there was a question from us and an answer from user
+        # OR if it's the very first question (start) then we don't log yet as per req.
+        
+        # Accumulate thoughts
+        turn_thoughts = state.get("current_turn_thoughts", {})
+        # interviewer_thought could be about which instruction was followed
+        turn_thoughts["Interviewer"] = f"Generating response based on instruction: {instruction[:100]}..."
+        
+        formatted_thoughts = ""
+        for agent, thought in turn_thoughts.items():
+            formatted_thoughts += f"[{agent}]: {thought}\n"
+            
+        last_question = state.get("current_question", "")
+        last_user_input = ""
         if messages and isinstance(messages[-1], HumanMessage):
-             turn_log["user_input"] = messages[-1].content
-
+             last_user_input = messages[-1].content
+             
+        turn_log_entry = None
+        # Only log if we had a question and user replied (standard turn)
+        # Or if user replied to starting prompt?
+        # Req: "первый вопрос (agent_visible_message) – ответ кандидата (user_message) – размышления (internal_thoughts) – логируем как turn_id: 1"
+        if last_question and last_user_input:
+            turn_log_entry = {
+                "turn_id": loop_count, # loop_count reflects completed QA pairs
+                "agent_visible_message": last_question,
+                "user_message": last_user_input,
+                "internal_thoughts": formatted_thoughts
+            }
+        
         return {
-            "messages": [AIMessage(content=response.response_text)], 
-            "interview_log": [turn_log] if not critic_feedback else [], # Avoid logging rejected attempts or handle later
-            "loop_count": loop_count if critic_feedback else loop_count + 1, # Don't increment count on retries
-            "critic_feedback": "", # Reset feedback
-            "critic_retry_count": critic_retry_count # Keep for the graph's conditional edge
+            "messages": [AIMessage(content=new_question)], 
+            "interview_log": [turn_log_entry] if turn_log_entry else [],
+            "current_question": new_question,
+            "loop_count": loop_count if critic_feedback else loop_count + 1,
+            "critic_feedback": "",
+            "critic_retry_count": critic_retry_count,
+            "current_turn_thoughts": {} # Clear for next turn
         }

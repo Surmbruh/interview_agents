@@ -23,7 +23,8 @@ def planner_node(state: AgentState):
     
     # Initialize LLM using settings
     api_base = settings.OPENAI_API_BASE
-    llm = ChatOpenAI(model=settings.MODEL_ROUTER, temperature=0, base_url=api_base)
+    # Increase temperature for variety in topic selection across different sessions
+    llm = ChatOpenAI(model=settings.MODEL_ROUTER, temperature=0.8, base_url=api_base)
     
     # Structured output
     structured_llm = llm.with_structured_output(PlanOutput)
@@ -38,6 +39,9 @@ Topics should be:
 1. Relevant to the position and grade.
 2. Specific (not just "Python", but "GIL and Concurrency" or "Memory Management").
 3. Aligned with the company's tech stack if provided.
+
+**VARIETY IS KEY**: Don't always pick the same standard topics. Mix core language features, frameworks, architecture, and toolsets. 
+Even for the same position, try to explore different sub-areas in each plan to ensure broad but varied testing.
 """
     
     prompt = ChatPromptTemplate.from_messages([

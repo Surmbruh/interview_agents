@@ -9,78 +9,87 @@ import concurrent.futures
 def feedback_node(state: AgentState):
     """
     Generates the final report, performs bonus web search for roadmap, 
-    and saves the log.
+    and saves the log (including the final turn N).
     """
     print("--- Generating Feedback (Including Bonus Search) ---")
     
-    # 1. Generate core report (Manager Decision + Technical Review)
-    # This uses the logic we already built in utils/report.py
-    # We will invoke it, but we might want to intercept the roadmap part to add links.
-    
-    # Let's import the specific generators to have more control
     from utils.report import generate_technical_report
     from langchain_openai import ChatOpenAI
     from config import settings
+    from agents.manager import ManagerAgent
     
     api_base = settings.OPENAI_API_BASE
     llm = ChatOpenAI(model=settings.MODEL_INTERVIEWER, temperature=0, base_url=api_base)
     
-    # A. Manager Decision
-    from agents.manager import ManagerAgent
+    # 1. Manager Decision
     manager = ManagerAgent(llm)
     manager_decision = manager.evaluate(state)
     manager_report = manager.format_decision_report(manager_decision)
     
-    # B. Technical Review
+    # --- LOGGING FINAL TURN (N) ---
+    # According to req: turn N includes Question N, Stop Answer, and Thoughts about final feedback.
+    loop_count = state.get("loop_count", 0)
+    last_question = state.get("current_question", "")
+    messages = state.get("messages", [])
+    last_user_message = ""
+    if messages and hasattr(messages[-1], "content"):
+        last_user_message = messages[-1].content
+        
+    # Aggregate thoughts for turn N
+    turn_thoughts = state.get("current_turn_thoughts", {})
+    # Manager's deliberation is part of final thoughts
+    turn_thoughts["Manager"] = f"Final evaluation: {manager_decision.get('recommendation', 'N/A')}. Confidence: {manager_decision.get('confidence', 0)}%"
+    
+    formatted_thoughts = ""
+    for agent, thought in turn_thoughts.items():
+        formatted_thoughts += f"[{agent}]: {thought}\n"
+        
+    final_turn_log = {
+        "turn_id": loop_count + 1,
+        "agent_visible_message": last_question,
+        "user_message": last_user_message,
+        "internal_thoughts": formatted_thoughts
+    }
+    
+    # 2. Technical Review
     technical_report = generate_technical_report(state, llm)
     
-    # C. Roadmap + Bonus Search
-    # First, identify gaps from internal thoughts
+    # 3. Roadmap + Bonus Search (Existing logic)
     internal_thoughts = state.get("internal_thoughts", [])
     gaps = []
     for thought in internal_thoughts:
-        if isinstance(thought, dict):
-            decision = thought.get("decision", "")
-            if decision in ["DECREASE_DIFFICULTY", "MAINTAIN"]:
-                analysis = thought.get("analysis", "")
-                if analysis:
-                    gaps.append(analysis)
-    
-    # Perform Search for Gaps (BONUS)
-    search_tool = DuckDuckGoSearchRun()
+         if isinstance(thought, dict):
+            if thought.get("decision") in ["DECREASE_DIFFICULTY", "MAINTAIN"]:
+                gaps.append(thought.get("analysis", ""))
+
+    from duckduckgo_search import DDGS
     links_section = ""
-    
     if gaps:
         print("    🔎 Searching for learning resources (Bonus)...")
-        # Limit to top 3 gaps to save time
         top_gaps = gaps[:3] 
         links = []
-        
         def search_gap(gap_text):
             try:
-                # Extract keywords implicitly by searching the gap description
-                # We can ask LLM to summarize gap into query, but for speed let's just search the main topic + "tutorial"
-                # A simple heuristic: search the analysis text limitation
                 query = f"guide tutorial documentation {gap_text[:50]}"
-                res = search_tool.invoke(query)
-                return f"- **Context**: {gap_text[:100]}...\n  - **Resources**: {res[:200]}..." 
-            except Exception:
+                with DDGS() as ddgs:
+                    results = list(ddgs.text(query, max_results=1))
+                    if results:
+                        res = results[0]
+                        return f"- **Topic**: {gap_text[:100]}...\n  - **Resource**: [{res['title']}]({res['href']})"
                 return None
+            except Exception: return None
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
             future_to_gap = {executor.submit(search_gap, gap): gap for gap in top_gaps}
             for future in concurrent.futures.as_completed(future_to_gap):
                 result = future.result()
-                if result:
-                    links.append(result)
-        
+                if result: links.append(result)
         if links:
             links_section = "### 🔗 Рекомендованные материалы (Auto-Generated)\n" + "\n".join(links)
-    
-    # Generate Roadmap Text
+
+    from utils.report import generate_development_roadmap
     roadmap_core = generate_development_roadmap(state, llm)
     
-    # Append content
     full_report = f"""
 # 📋 Отчёт по техническому интервью
 
@@ -101,9 +110,14 @@ def feedback_node(state: AgentState):
 *Generated by Multi-Agent Interview Coach with Live Search*
 """
 
-    # Save log
-    candidate_name = state["candidate_info"].get("Name", "Candidate")
-    LoggerUtils.save_log(candidate_name, state["interview_log"], full_report)
+    # Save log with scenario filename
+    session_id = state.get("session_id", 1)
+    filename = f"interview_log_{session_id}.json"
+    
+    # Join the accumulated log with the very last turn
+    full_log = state.get("interview_log", []) + [final_turn_log]
+    
+    LoggerUtils.save_log(state['candidate_info'].get('Name', 'N/A'), full_log, full_report, filename=filename)
     
     print("\n" + "="*30)
     print("FINAL FEEDBACK REPORT")

@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  interview-coach:
+    build: .
+    container_name: interview_coach_app
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    restart: unless-stopped

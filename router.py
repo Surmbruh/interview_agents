@@ -21,7 +21,13 @@ def router_node(state: AgentState):
     Использует gpt-4o-mini для скорости и экономии.
     """
     messages = state["messages"]
-    last_message = messages[-1].content if messages else ""
+    
+    # If this is the very first turn (no messages yet), just proceed as ANSWER
+    if not messages:
+        print("--- Router: Initial turn, Proceeding to Interviewer ---")
+        return {"router_decision": "ANSWER"}
+        
+    last_message = messages[-1].content
     
     # Инициализация модели через settings
     api_base = settings.OPENAI_API_BASE

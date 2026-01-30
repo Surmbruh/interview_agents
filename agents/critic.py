@@ -53,10 +53,14 @@ If any criterion fails, set status to REJECTED and provide specific feedback on 
     })
     
     print(f"--- Critic Decision: {response.status} ---")
-    if response.status == "REJECTED":
-        print(f"    Feedback: {response.feedback}")
+    
+    # Store thoughts
+    critic_thought = f"Decision: {response.status}. {response.feedback}"
+    current_thoughts = state.get("current_turn_thoughts", {})
+    current_thoughts["Critic"] = critic_thought
         
     return {
         "critic_status": response.status,
-        "critic_feedback": response.feedback
+        "critic_feedback": response.feedback,
+        "current_turn_thoughts": current_thoughts
     }
