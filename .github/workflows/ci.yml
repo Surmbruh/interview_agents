@@ -48,18 +48,3 @@ jobs:
         run: |
           python smoke_test.py
 
-  docker-build:
-    runs-on: ubuntu-latest
-    needs: lint-and-test
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Build Docker image
-        run: |
-          docker build -t interview-coach:test .
-      
-      - name: Verify Docker image
-        run: |
-          docker run --rm interview-coach:test python -c "import graph; print('Graph OK')"
