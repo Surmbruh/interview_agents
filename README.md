@@ -251,10 +251,3 @@ make docker-down  # Docker Compose down
 | **Галлюцинации пользователя** | Observer детектирует ложные факты → Interviewer корректирует |
 | **Off-topic** | Observer → возврат к теме интервью |
 
-## Лицензия
-
-MIT License
-
----
-
-*Проект разработан для демонстрации возможностей Multi-Agent Systems и LangGraph.*
