@@ -24,7 +24,7 @@ Your role is to make the FINAL hiring decision based on:
 2. The Observer's analysis and notes
 3. The candidate's stated experience and grade
 
-**You MUST write your decision in Russian.**
+**You MUST write your decision in Russian. DO NOT use any emojis or emoticons in your response.**
 
 ## EVALUATION CRITERIA
 
@@ -157,34 +157,25 @@ Based on all the above, provide your final hiring decision.""")
         ss_honesty = soft_skills.get("honesty", "N/A")
         ss_engagement = soft_skills.get("engagement", "N/A")
         
-        # Decision emoji
-        decision_emoji = {
-            "STRONG_HIRE": "🌟",
-            "HIRE": "✅",
-            "MAYBE": "🤔",
-            "NO_HIRE": "❌",
-            "STRONG_NO_HIRE": "⛔"
-        }.get(decision, "❓")
-        
         report = f"""
-## 📊 Решение Hiring Manager
+## Решение Hiring Manager
 
-### {decision_emoji} Решение: **{decision}**
+### Решение: **{decision}**
 - **Уверенность**: {confidence}%
 - **Оценка грейда**: {grade_assessment}
 
-### 🧠 Soft Skills & Communication
+### Soft Skills & Communication
 - **Clarity (Ясность)**: {ss_clarity}
 - **Honesty (Честность)**: {ss_honesty}
 - **Engagement (Вовлечённость)**: {ss_engagement}
 
-### 💪 Ключевые сильные стороны
+### Ключевые сильные стороны
 {chr(10).join(['- ' + s for s in strengths]) if strengths else '- Не выявлено'}
 
-### ⚠️ Ключевые замечания
+### Ключевые замечания
 {chr(10).join(['- ' + c for c in concerns]) if concerns else '- Не выявлено'}
 
-### 📝 Рекомендация
+### Рекомендация
 {recommendation}
 """
         return report

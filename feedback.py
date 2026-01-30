@@ -19,7 +19,12 @@ def feedback_node(state: AgentState):
     from agents.manager import ManagerAgent
     
     api_base = settings.OPENAI_API_BASE
-    llm = ChatOpenAI(model=settings.MODEL_INTERVIEWER, temperature=0, base_url=api_base)
+    llm = ChatOpenAI(
+        model=settings.MODEL_INTERVIEWER, 
+        temperature=0, 
+        base_url=api_base,
+        api_key=settings.OPENAI_API_KEY
+    )
     
     # 1. Manager Decision
     manager = ManagerAgent(llm)
@@ -62,10 +67,10 @@ def feedback_node(state: AgentState):
             if thought.get("decision") in ["DECREASE_DIFFICULTY", "MAINTAIN"]:
                 gaps.append(thought.get("analysis", ""))
 
-    from duckduckgo_search import DDGS
+    from ddgs import DDGS
     links_section = ""
     if gaps:
-        print("    🔎 Searching for learning resources (Bonus)...")
+        print("    Searching for learning resources (Bonus)...")
         top_gaps = gaps[:3] 
         links = []
         def search_gap(gap_text):
@@ -85,15 +90,15 @@ def feedback_node(state: AgentState):
                 result = future.result()
                 if result: links.append(result)
         if links:
-            links_section = "### 🔗 Рекомендованные материалы (Auto-Generated)\n" + "\n".join(links)
+            links_section = "### Рекомендованные материалы (Auto-Generated)\n" + "\n".join(links)
 
     from utils.report import generate_development_roadmap
     roadmap_core = generate_development_roadmap(state, llm)
     
     full_report = f"""
-# 📋 Отчёт по техническому интервью
+# Отчёт по техническому интервью
 
-## 👤 Информация о кандидате
+## Информация о кандидате
 - **Имя**: {state['candidate_info'].get('Name', 'N/A')}
 - **Позиция**: {state['candidate_info'].get('Position', 'N/A')}
 - **Грейд**: {state['candidate_info'].get('Grade', 'N/A')}

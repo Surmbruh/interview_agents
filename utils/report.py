@@ -43,9 +43,9 @@ def generate_final_report(state: AgentState) -> str:
     
     # Combine all reports
     full_report = f"""
-# 📋 Отчёт по техническому интервью
+# Отчёт по техническому интервью
 
-## 👤 Информация о кандидате
+## Информация о кандидате
 - **Имя**: {candidate_info.get('Name', 'N/A')}
 - **Позиция**: {candidate_info.get('Position', 'N/A')}
 - **Грейд**: {candidate_info.get('Grade', 'N/A')}
@@ -74,14 +74,14 @@ def generate_technical_report(state: AgentState, llm: ChatOpenAI) -> str:
     
     system_prompt = """You are a Technical Assessment Specialist.
 Analyze the interview transcript and observer notes to create a detailed technical assessment.
-**You MUST write in Russian.**
+**You MUST write in Russian. DO NOT use any emojis or emoticons in your analysis.**
 
 Structure your assessment as:
-1. ✅ Подтверждённые навыки (Confirmed Skills) - list specific topics where candidate was correct.
-2. ❌ Выявленные пробелы (Knowledge Gaps) - topics where candidate failed or was unsure.
+1. Подтверждённые навыки (Confirmed Skills) - list specific topics where candidate was correct.
+2. Выявленные пробелы (Knowledge Gaps) - topics where candidate failed or was unsure.
    **CRITICAL: For EACH gap, you MUST provide the Correct Answer/Explanation.**
    Format: "- Topic: Error... (Correct Answer: ...)"
-3. 🔑 Ключевые моменты (Key Moments) - best and worst answers.
+3. Ключевые моменты (Key Moments) - best and worst answers.
 """
     
     # Format data
@@ -114,7 +114,7 @@ Generate the technical assessment section.""")
         "transcript": transcript
     })
     
-    return f"## 🔧 Техническая оценка\n\n{response.content}"
+    return f"## Техническая оценка\n\n{response.content}"
 
 
 def generate_development_roadmap(state: AgentState, llm: ChatOpenAI) -> str:
@@ -127,13 +127,13 @@ def generate_development_roadmap(state: AgentState, llm: ChatOpenAI) -> str:
     
     system_prompt = """You are a Career Development Coach.
 Based on the interview performance, create a personalized development roadmap.
-**You MUST write in Russian.**
+**You MUST write in Russian. DO NOT use any emojis or emoticons.**
 
 Structure the roadmap as:
-1. 📚 Что изучить (What to Learn) - specific topics and resources
-2. 🔗 Полезные ресурсы (Resources) - **Provide links to official docs or high-quality articles for the identified gaps.**
-3. 💡 Рекомендации по практике (Practice Recommendations) - projects, exercises
-4. 🎯 Краткосрочные цели (Next 1-3 months)
+1. Что изучить (What to Learn) - specific topics and resources
+2. Полезные ресурсы (Resources) - **Provide links to official docs or high-quality articles for the identified gaps.**
+3. Рекомендации по практике (Practice Recommendations) - projects, exercises
+4. Краткосрочные цели (Next 1-3 months)
 
 Be specific and actionable. Reference actual gaps identified in the interview.
 """
@@ -167,4 +167,4 @@ Generate the development roadmap section.""")
         "num_questions": len(interview_log)
     })
     
-    return f"## 🗺️ План развития\n\n{response.content}"
+    return f"## План развития\n\n{response.content}"
